@@ -5,38 +5,47 @@ class ClaudeApiService {
   }
 
   async makeRequest(prompt, maxTokens = 2000) {
-    try {
-      const response = await fetch(this.baseUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-          model: this.model,
-          max_tokens: maxTokens,
-          messages: [
-            { role: 'user', content: prompt }
-          ]
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      let responseText = data.content[0].text;
-      
-      // Clean up any markdown formatting
-      responseText = responseText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-      
-      return responseText;
-    } catch (error) {
-      console.error('Claude API Error:', error);
-      throw error;
+  try {
+    const apiKey = process.env.REACT_APP_CLAUDE_API_KEY;
+    
+    if (!apiKey) {
+      throw new Error('API key not found. Please check environment variables.');
     }
+    
+    const response = await fetch(this.baseUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,  // Changed from 'anthropic-version'
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: this.model,
+        max_tokens: maxTokens,
+        messages: [
+          { role: 'user', content: prompt }
+        ]
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('API Error Response:', errorText);
+      throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    let responseText = data.content[0].text;
+    
+    // Clean up any markdown formatting
+    responseText = responseText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    
+    return responseText;
+  } catch (error) {
+    console.error('Claude API Error:', error);
+    throw error;
   }
+}
 
   async analyzeMediaData(uploadedData) {
     const prompt = `
