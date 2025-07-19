@@ -1,11 +1,5 @@
 class ClaudeApiService {
   constructor() {
-    this.baseUrl = 'https://api.anthropic.com/v1/messages';
-    this.model = 'claude-sonnet-4-20250514';
-  }
-
-  class ClaudeApiService {
-  constructor() {
     // Use your Vercel domain or relative path for production
     this.baseUrl = '/api/claude';
     this.model = 'claude-sonnet-4-20250514';
@@ -41,7 +35,6 @@ class ClaudeApiService {
       throw error;
     }
   }
-
 
   async analyzeMediaData(uploadedData) {
     const prompt = `
