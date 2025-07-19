@@ -4,25 +4,29 @@ class ClaudeApiService {
     this.model = 'claude-sonnet-4-20250514';
   }
 
+  class ClaudeApiService {
+  constructor() {
+    // Use your Vercel domain or relative path for production
+    this.baseUrl = '/api/claude';
+    this.model = 'claude-sonnet-4-20250514';
+  }
+
   async makeRequest(prompt, maxTokens = 2000) {
     try {
       const response = await fetch(this.baseUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'anthropic-version': '2023-06-01',
         },
         body: JSON.stringify({
-          model: this.model,
-          max_tokens: maxTokens,
-          messages: [
-            { role: 'user', content: prompt }
-          ]
+          prompt: prompt,
+          maxTokens: maxTokens
         })
       });
 
       if (!response.ok) {
-        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+        const errorData = await response.json();
+        throw new Error(`API Error: ${response.status} - ${errorData.error}`);
       }
 
       const data = await response.json();
@@ -37,6 +41,7 @@ class ClaudeApiService {
       throw error;
     }
   }
+
 
   async analyzeMediaData(uploadedData) {
     const prompt = `
