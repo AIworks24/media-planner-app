@@ -195,8 +195,9 @@ export const calculateBasicMetrics = (data) => {
   const validation = validateMediaData(data);
   const mappings = validation.columnMappings;
   
+  const totalRows = data.rows.length;
+  
   try {
-    let totalRows = data.rows.length;
     let metrics = {
       totalCampaigns: totalRows,
       totalRows: totalRows,
