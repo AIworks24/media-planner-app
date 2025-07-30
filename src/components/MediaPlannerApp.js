@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Upload, BarChart3, Target, TrendingUp, FileText, Download, Zap, Eye, MousePointer, AlertCircle, Activity } from 'lucide-react';
+import { Upload, BarChart3, Target, TrendingUp, FileText, Download, Zap, Eye, MousePointer, AlertCircle, Activity, ChevronDown } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 import claudeApi from '../services/claudeApi';
 import { processCSVFile, validateMediaData, calculateBasicMetrics } from '../utils/dataProcessing';
@@ -13,6 +13,7 @@ const MediaPlannerApp = () => {
   const [activeTab, setActiveTab] = useState('upload');
   const [error, setError] = useState(null);
   const [validationResult, setValidationResult] = useState(null);
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   // Handle file upload and parsing
   const handleFileUpload = useCallback(async (event) => {
@@ -123,8 +124,8 @@ const MediaPlannerApp = () => {
     };
   };
 
-  // Export results as JSON
-  const exportResults = () => {
+  // Export results as JSON (legacy - keeping for backup)
+  const exportAsJSON = () => {
     const exportData = {
       uploadedData: uploadedData,
       analysisResults: analysisResults,
@@ -141,6 +142,260 @@ const MediaPlannerApp = () => {
     linkElement.setAttribute('href', dataUri);
     linkElement.setAttribute('download', exportFileDefaultName);
     linkElement.click();
+  };
+
+  // Export results as CSV
+  const exportAsCSV = () => {
+    if (!analysisResults) return;
+
+    let csvContent = '';
+    const timestamp = new Date().toISOString().split('T')[0];
+
+    // Analysis Summary
+    csvContent += 'MEDIA CAMPAIGN ANALYSIS REPORT\n';
+    csvContent += `Generated: ${new Date().toLocaleDateString()}\n\n`;
+    csvContent += `Overall Performance Summary\n`;
+    csvContent += `"${analysisResults.overallPerformance.summary}"\n\n`;
+
+    // Key Metrics
+    csvContent += 'KEY METRICS\n';
+    csvContent += 'Metric,Value\n';
+    Object.entries(analysisResults.overallPerformance.keyMetrics).forEach(([key, value]) => {
+      csvContent += `${key.replace(/([A-Z])/g, ' $1').trim()},${value}\n`;
+    });
+    csvContent += '\n';
+
+    // Channel Analysis
+    csvContent += 'CHANNEL PERFORMANCE ANALYSIS\n';
+    csvContent += 'Channel,Performance,CTR,CPM,Reach,Insights\n';
+    analysisResults.channelAnalysis.forEach(channel => {
+      const insights = `"${channel.insights.replace(/"/g, '""')}"`;
+      csvContent += `${channel.channel},${channel.performance},${channel.metrics.ctr || 'N/A'},${channel.metrics.cpm || 'N/A'},${channel.metrics.reach || 'N/A'},${insights}\n`;
+    });
+    csvContent += '\n';
+
+    // Recommendations if available
+    if (recommendations) {
+      csvContent += 'BUDGET RECOMMENDATIONS\n';
+      csvContent += 'Channel,Current Budget,Recommended Budget,Change %,Reasoning\n';
+      recommendations.budgetReallocation.recommendations.forEach(rec => {
+        const changePercent = Math.round(((rec.recommendedBudget - rec.currentBudget) / rec.currentBudget) * 100);
+        const reasoning = `"${rec.reasoning.replace(/"/g, '""')}"`;
+        csvContent += `${rec.channel},${rec.currentBudget},${rec.recommendedBudget},${changePercent}%,${reasoning}\n`;
+      });
+      csvContent += '\n';
+
+      csvContent += 'CHANNEL STRATEGY RECOMMENDATIONS\n';
+      csvContent += 'Channel,Action,Expected Improvement,Reasoning\n';
+      recommendations.channelRecommendations.forEach(rec => {
+        const reasoning = `"${rec.reasoning.replace(/"/g, '""')}"`;
+        csvContent += `${rec.channel},${rec.action},${rec.expectedImprovement},${reasoning}\n`;
+      });
+    }
+
+    // Create and download CSV
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `media-analysis-report-${timestamp}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Export results as PDF
+  const exportAsPDF = () => {
+    if (!analysisResults) return;
+
+    const timestamp = new Date().toLocaleDateString();
+    
+    // Create HTML content for PDF
+    let htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Media Campaign Analysis Report</title>
+      <style>
+        body { font-family: Arial, sans-serif; margin: 40px; color: #333; }
+        .header { text-align: center; margin-bottom: 40px; border-bottom: 2px solid #3b82f6; padding-bottom: 20px; }
+        .header h1 { color: #1f2937; margin: 0; font-size: 28px; }
+        .header p { color: #6b7280; margin: 5px 0; }
+        .section { margin: 30px 0; page-break-inside: avoid; }
+        .section h2 { color: #1f2937; border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; }
+        .section h3 { color: #374151; margin-top: 25px; }
+        .summary-box { background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 15px 0; }
+        .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin: 20px 0; }
+        .metric-card { background: #f9fafb; border: 1px solid #e5e7eb; padding: 15px; border-radius: 6px; text-align: center; }
+        .metric-value { font-size: 24px; font-weight: bold; color: #3b82f6; }
+        .metric-label { font-size: 12px; color: #6b7280; text-transform: uppercase; }
+        .channel-item { background: #f9fafb; border: 1px solid #e5e7eb; padding: 15px; margin: 10px 0; border-radius: 6px; }
+        .channel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .channel-name { font-weight: bold; font-size: 16px; }
+        .performance-badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+        .excellent { background: #d1fae5; color: #065f46; }
+        .good { background: #dbeafe; color: #1e40af; }
+        .poor { background: #fef3c7; color: #92400e; }
+        .channel-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }
+        .channel-metric { text-align: center; }
+        .channel-metric-value { font-weight: bold; }
+        .channel-metric-label { font-size: 11px; color: #6b7280; }
+        .recommendations { margin: 20px 0; }
+        .rec-item { background: #f9fafb; border-left: 4px solid #3b82f6; padding: 15px; margin: 10px 0; }
+        .rec-header { font-weight: bold; margin-bottom: 8px; }
+        .tag { display: inline-block; background: #e0e7ff; color: #3730a3; padding: 2px 8px; border-radius: 12px; font-size: 11px; margin: 2px; }
+        @media print { body { margin: 20px; } .section { page-break-inside: avoid; } }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h1>🎯 Media Campaign Analysis Report</h1>
+        <p>AI-Powered Campaign Performance Analysis</p>
+        <p>Generated: ${timestamp}</p>
+      </div>
+
+      <div class="section">
+        <h2>📊 Performance Overview</h2>
+        <div class="summary-box">
+          <p><strong>Executive Summary:</strong> ${analysisResults.overallPerformance.summary}</p>
+        </div>
+        
+        <h3>Key Performance Metrics</h3>
+        <div class="metrics-grid">
+          ${Object.entries(analysisResults.overallPerformance.keyMetrics).map(([key, value]) => `
+            <div class="metric-card">
+              <div class="metric-value">${typeof value === 'number' ? value.toLocaleString() : value}</div>
+              <div class="metric-label">${key.replace(/([A-Z])/g, ' $1').trim()}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>📈 Channel Performance Analysis</h2>
+        ${analysisResults.channelAnalysis.map(channel => `
+          <div class="channel-item">
+            <div class="channel-header">
+              <span class="channel-name">${channel.channel}</span>
+              <span class="performance-badge ${channel.performance}">${channel.performance.toUpperCase()}</span>
+            </div>
+            <p>${channel.insights}</p>
+            <div class="channel-metrics">
+              ${Object.entries(channel.metrics).map(([metric, value]) => `
+                <div class="channel-metric">
+                  <div class="channel-metric-value">${value}</div>
+                  <div class="channel-metric-label">${metric.toUpperCase()}</div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+
+      <div class="section">
+        <h2>🎯 Demographic Insights</h2>
+        <div class="summary-box">
+          <p><strong>Best Performing Segment:</strong> ${analysisResults.demographicInsights.bestPerformingDemo}</p>
+          <p>${analysisResults.demographicInsights.insights}</p>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>🚀 Optimization Opportunities</h2>
+        <div class="recommendations">
+          ${analysisResults.optimizationOpportunities.map(opportunity => `
+            <div class="rec-item">• ${opportunity}</div>
+          `).join('')}
+        </div>
+      </div>`;
+
+    if (recommendations) {
+      htmlContent += `
+      <div class="section">
+        <h2>💰 Budget Reallocation Recommendations</h2>
+        ${recommendations.budgetReallocation.recommendations.map(rec => {
+          const changePercent = Math.round(((rec.recommendedBudget - rec.currentBudget) / rec.currentBudget) * 100);
+          const changeColor = changePercent > 0 ? '#059669' : '#dc2626';
+          return `
+            <div class="rec-item">
+              <div class="rec-header">${rec.channel}</div>
+              <p>Budget Change: ${rec.currentBudget.toLocaleString()} → ${rec.recommendedBudget.toLocaleString()} 
+              <span style="color: ${changeColor}; font-weight: bold;">(${changePercent > 0 ? '+' : ''}${changePercent}%)</span></p>
+              <p>${rec.reasoning}</p>
+            </div>
+          `;
+        }).join('')}
+      </div>
+
+      <div class="section">
+        <h2>📋 Strategic Recommendations</h2>
+        ${recommendations.channelRecommendations.map(rec => `
+          <div class="rec-item">
+            <div class="rec-header">${rec.channel} - ${rec.action.toUpperCase()}</div>
+            <p><strong>Expected Improvement:</strong> ${rec.expectedImprovement}</p>
+            <p>${rec.reasoning}</p>
+          </div>
+        `).join('')}
+      </div>
+
+      <div class="section">
+        <h2>🎯 Targeting Recommendations</h2>
+        <div class="summary-box">
+          <p><strong>Demographics:</strong> 
+          ${recommendations.targetingRecommendations.demographics.map(demo => `<span class="tag">${demo}</span>`).join('')}</p>
+          
+          <p><strong>Geography:</strong> 
+          ${recommendations.targetingRecommendations.geography.map(geo => `<span class="tag">${geo}</span>`).join('')}</p>
+          
+          <p><strong>Strategy:</strong> ${recommendations.targetingRecommendations.reasoning}</p>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>🎨 Creative Testing Recommendations</h2>
+        <div class="recommendations">
+          ${recommendations.creativeTesting.map(test => `
+            <div class="rec-item">• ${test}</div>
+          `).join('')}
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>✅ Next Steps & Action Items</h2>
+        ${recommendations.nextSteps.map(step => {
+          const priorityColor = step.priority === 'high' ? '#dc2626' : 
+                               step.priority === 'medium' ? '#d97706' : '#059669';
+          return `
+            <div class="rec-item">
+              <div class="rec-header" style="color: ${priorityColor};">
+                ${step.priority.toUpperCase()} PRIORITY: ${step.action}
+              </div>
+              <p><strong>Timeline:</strong> ${step.timeline}</p>
+            </div>
+          `;
+        }).join('')}
+      </div>`;
+    }
+
+    htmlContent += `
+    </body>
+    </html>`;
+
+    // Create blob and download
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `media-analysis-report-${new Date().toISOString().split('T')[0]}.html`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    // Show instruction to user
+    alert('Report exported as HTML file! Open the downloaded file in your browser and use "Print to PDF" (Ctrl+P or Cmd+P) to save as PDF.');
   };
 
   const chartData = generateChartData();
@@ -163,13 +418,54 @@ const MediaPlannerApp = () => {
             </div>
             <div className="flex items-center space-x-4">
               {(analysisResults || recommendations) && (
-                <button
-                  onClick={exportResults}
-                  className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                >
-                  <Download className="h-4 w-4" />
-                  <span>Export Results</span>
-                </button>
+                <div className="relative">
+                  <button
+                    onClick={() => setShowExportMenu(!showExportMenu)}
+                    className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    <Download className="h-4 w-4" />
+                    <span>Export Results</span>
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
+                  
+                  {showExportMenu && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-50">
+                      <div className="py-1">
+                        <button
+                          onClick={() => {
+                            exportAsPDF();
+                            setShowExportMenu(false);
+                          }}
+                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                        >
+                          <FileText className="h-4 w-4" />
+                          <span>Export as PDF Report</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            exportAsCSV();
+                            setShowExportMenu(false);
+                          }}
+                          className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
+                        >
+                          <BarChart3 className="h-4 w-4" />
+                          <span>Export as CSV Data</span>
+                        </button>
+                        <hr className="my-1" />
+                        <button
+                          onClick={() => {
+                            exportAsJSON();
+                            setShowExportMenu(false);
+                          }}
+                          className="w-full text-left px-4 py-2 text-sm text-gray-500 hover:bg-gray-50 flex items-center space-x-2"
+                        >
+                          <Download className="h-4 w-4" />
+                          <span>Export as JSON (Dev)</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
               <div className="bg-green-100 px-3 py-1 rounded-full">
                 <span className="text-green-800 text-sm font-medium">✨ AI Powered</span>
@@ -178,6 +474,14 @@ const MediaPlannerApp = () => {
           </div>
         </div>
       </div>
+
+      {/* Close export menu when clicking outside */}
+      {showExportMenu && (
+        <div 
+          className="fixed inset-0 z-40" 
+          onClick={() => setShowExportMenu(false)}
+        ></div>
+      )}
 
       {/* Analysis Progress Indicator */}
       {isAnalyzing && (
