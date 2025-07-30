@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Upload, BarChart3, Target, TrendingUp, FileText, Download, Zap, Eye, MousePointer, AlertCircle } from 'lucide-react';
+import { Upload, BarChart3, Target, TrendingUp, FileText, Download, Zap, Eye, MousePointer, AlertCircle, Activity } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 import claudeApi from '../services/claudeApi';
 import { processCSVFile, validateMediaData, calculateBasicMetrics } from '../utils/dataProcessing';
@@ -9,6 +9,7 @@ const MediaPlannerApp = () => {
   const [analysisResults, setAnalysisResults] = useState(null);
   const [recommendations, setRecommendations] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisProgress, setAnalysisProgress] = useState('');
   const [activeTab, setActiveTab] = useState('upload');
   const [error, setError] = useState(null);
   const [validationResult, setValidationResult] = useState(null);
@@ -41,28 +42,85 @@ const MediaPlannerApp = () => {
     }
   }, []);
 
-  // AI Analysis using Claude
+  // Enhanced AI Analysis with progress tracking
   const analyzeMediaData = async () => {
     if (!uploadedData) return;
     
     setIsAnalyzing(true);
     setActiveTab('analysis');
     setError(null);
+    setAnalysisProgress('Initializing AI analysis...');
 
     try {
+      // Step 1: Analyze data
+      setAnalysisProgress('Analyzing campaign performance and channel metrics...');
       const analysisData = await claudeApi.analyzeMediaData(uploadedData);
       setAnalysisResults(analysisData);
       
-      // Generate recommendations
+      // Step 2: Generate recommendations
+      setAnalysisProgress('Generating strategic recommendations...');
       const recommendationsData = await claudeApi.generateRecommendations(analysisData);
       setRecommendations(recommendationsData);
+      
+      setAnalysisProgress('Analysis complete! ✨');
+      
+      // Brief delay to show completion message
+      setTimeout(() => {
+        setAnalysisProgress('');
+      }, 2000);
       
     } catch (error) {
       console.error('Analysis error:', error);
       setError(`Analysis failed: ${error.message}. Please check your data format and try again.`);
+      setAnalysisProgress('');
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  // Generate dynamic chart data based on analysis results
+  const generateChartData = () => {
+    if (!analysisResults) {
+      // Return sample data if no analysis yet
+      return {
+        channelPerformance: [
+          { channel: 'Facebook', ctr: 2.3, cpm: 15.50, reach: 45000, performance: 'good' },
+          { channel: 'Google Ads', ctr: 3.1, cpm: 12.30, reach: 38000, performance: 'excellent' },
+          { channel: 'TV', ctr: 1.8, cpm: 25.00, reach: 120000, performance: 'good' },
+          { channel: 'Radio', ctr: 1.2, cpm: 8.50, reach: 85000, performance: 'poor' },
+          { channel: 'Billboard', ctr: 0.8, cpm: 5.20, reach: 200000, performance: 'poor' }
+        ],
+        metricComparison: [
+          { metric: 'CTR', value: 2.1, benchmark: 2.5 },
+          { metric: 'CPM', value: 15.2, benchmark: 18.0 },
+          { metric: 'Reach', value: 120000, benchmark: 100000 },
+          { metric: 'Frequency', value: 3.2, benchmark: 3.0 }
+        ]
+      };
+    }
+
+    // Convert analysis results to chart-friendly format
+    const channelData = analysisResults.channelAnalysis.map(channel => ({
+      channel: channel.channel,
+      ctr: channel.metrics.ctr || 0,
+      cpm: channel.metrics.cpm || 0,
+      reach: channel.metrics.reach || 0,
+      performance: channel.performance,
+      color: channel.performance === 'excellent' ? '#10b981' : 
+             channel.performance === 'good' ? '#3b82f6' : '#ef4444'
+    }));
+
+    const metricData = [
+      { metric: 'Avg CTR', value: analysisResults.overallPerformance.keyMetrics.avgCTR || 0, benchmark: 2.5 },
+      { metric: 'Avg CPM', value: analysisResults.overallPerformance.keyMetrics.avgCPM || 0, benchmark: 15.0 },
+      { metric: 'Total Reach', value: analysisResults.overallPerformance.keyMetrics.totalReach || 0, benchmark: 100000 },
+      { metric: 'Avg Frequency', value: analysisResults.overallPerformance.keyMetrics.avgFrequency || 0, benchmark: 3.0 }
+    ];
+
+    return {
+      channelPerformance: channelData,
+      metricComparison: metricData
+    };
   };
 
   // Export results as JSON
@@ -85,15 +143,7 @@ const MediaPlannerApp = () => {
     linkElement.click();
   };
 
-  // Sample data for visualization when no data is uploaded
-  const sampleChannelData = [
-    { channel: 'Facebook', ctr: 2.3, cpm: 15.50, reach: 45000 },
-    { channel: 'Google Ads', ctr: 3.1, cpm: 12.30, reach: 38000 },
-    { channel: 'TV', ctr: 1.8, cpm: 25.00, reach: 120000 },
-    { channel: 'Radio', ctr: 1.2, cpm: 8.50, reach: 85000 },
-    { channel: 'Billboard', ctr: 0.8, cpm: 5.20, reach: 200000 }
-  ];
-
+  const chartData = generateChartData();
   const colors = ['#8884d8', '#82ca9d', '#ffc658', '#ff7c7c', '#8dd1e1'];
 
   return (
@@ -128,6 +178,27 @@ const MediaPlannerApp = () => {
           </div>
         </div>
       </div>
+
+      {/* Analysis Progress Indicator */}
+      {isAnalyzing && (
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+            <div className="flex items-center space-x-4">
+              <div className="flex-shrink-0">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-medium text-blue-900">AI Analysis in Progress</h3>
+                <p className="text-blue-700 mt-1">{analysisProgress}</p>
+                <div className="mt-3 bg-blue-200 rounded-full h-2 overflow-hidden">
+                  <div className="bg-blue-600 h-full rounded-full transition-all duration-1000 animate-pulse" style={{ width: '70%' }}></div>
+                </div>
+              </div>
+              <Activity className="h-6 w-6 text-blue-600 animate-pulse" />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Error Display */}
       {error && (
@@ -257,7 +328,7 @@ const MediaPlannerApp = () => {
                   <button
                     onClick={analyzeMediaData}
                     disabled={isAnalyzing}
-                    className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-8 py-3 rounded-lg hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 inline-flex items-center space-x-2 transition-all transform hover:scale-105 disabled:transform-none"
+                    className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-8 py-3 rounded-lg hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center space-x-2 transition-all transform hover:scale-105 disabled:transform-none"
                   >
                     {isAnalyzing ? (
                       <>
@@ -275,43 +346,92 @@ const MediaPlannerApp = () => {
               )}
             </div>
 
-            {/* Sample Data Visualization */}
+            {/* Dynamic Dashboard Preview */}
             <div className="bg-white rounded-xl shadow-lg p-6">
-              <h3 className="text-lg font-bold text-gray-900 mb-4">Sample Dashboard Preview</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-gray-900">
+                  {analysisResults ? 'Analysis Results Dashboard' : 'Sample Dashboard Preview'}
+                </h3>
+                {analysisResults && (
+                  <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+                    ✨ Live Data
+                  </div>
+                )}
+              </div>
+              
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div>
-                  <h4 className="font-medium text-gray-700 mb-3">Channel Performance (CTR %)</h4>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={sampleChannelData}>
+                  <h4 className="font-medium text-gray-700 mb-3">
+                    Channel Performance {analysisResults ? '(CTR %)' : '(Sample CTR %)'}
+                  </h4>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart data={chartData.channelPerformance}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="channel" />
                       <YAxis />
-                      <Tooltip />
-                      <Bar dataKey="ctr" fill="#8884d8" />
+                      <Tooltip 
+                        formatter={(value, name) => [
+                          `${value}${name === 'ctr' ? '%' : name === 'cpm' ? '$' : ''}`,
+                          name.toUpperCase()
+                        ]}
+                      />
+                      <Bar dataKey="ctr" fill={analysisResults ? undefined : "#8884d8"}>
+                        {analysisResults && chartData.channelPerformance.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
+                
                 <div>
-                  <h4 className="font-medium text-gray-700 mb-3">Reach Distribution</h4>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <PieChart>
-                      <Pie
-                        data={sampleChannelData}
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={80}
-                        dataKey="reach"
-                        nameKey="channel"
-                      >
-                        {sampleChannelData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
+                  <h4 className="font-medium text-gray-700 mb-3">
+                    {analysisResults ? 'Performance vs Benchmarks' : 'Reach Distribution'}
+                  </h4>
+                  <ResponsiveContainer width="100%" height={250}>
+                    {analysisResults ? (
+                      <BarChart data={chartData.metricComparison}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="metric" />
+                        <YAxis />
+                        <Tooltip />
+                        <Bar dataKey="value" fill="#3b82f6" name="Actual" />
+                        <Bar dataKey="benchmark" fill="#e5e7eb" name="Benchmark" />
+                      </BarChart>
+                    ) : (
+                      <PieChart>
+                        <Pie
+                          data={chartData.channelPerformance}
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={80}
+                          dataKey="reach"
+                          nameKey="channel"
+                        >
+                          {chartData.channelPerformance.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    )}
                   </ResponsiveContainer>
                 </div>
               </div>
+
+              {analysisResults && (
+                <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+                  <h4 className="font-medium text-blue-900 mb-2">Key Performance Insights</h4>
+                  <p className="text-blue-800 text-sm">{analysisResults.overallPerformance.summary}</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {analysisResults.overallPerformance.topChannels.map((channel, idx) => (
+                      <span key={idx} className="bg-blue-200 text-blue-800 px-2 py-1 rounded text-xs font-medium">
+                        Top: {channel}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -339,6 +459,43 @@ const MediaPlannerApp = () => {
                         </div>
                       </div>
                     ))}
+                  </div>
+                </div>
+
+                {/* Enhanced Visualizations */}
+                <div className="bg-white rounded-xl shadow-lg p-6">
+                  <h3 className="text-lg font-bold text-gray-900 mb-4">Performance Visualizations</h3>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div>
+                      <h4 className="font-medium text-gray-700 mb-3">Channel CTR Comparison</h4>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <BarChart data={chartData.channelPerformance}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="channel" />
+                          <YAxis />
+                          <Tooltip formatter={(value) => [`${value}%`, 'CTR']} />
+                          <Bar dataKey="ctr">
+                            {chartData.channelPerformance.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                    
+                    <div>
+                      <h4 className="font-medium text-gray-700 mb-3">CPM vs Reach Analysis</h4>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <BarChart data={chartData.channelPerformance}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="channel" />
+                          <YAxis yAxisId="left" />
+                          <YAxis yAxisId="right" orientation="right" />
+                          <Tooltip />
+                          <Bar yAxisId="left" dataKey="cpm" fill="#8884d8" name="CPM ($)" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
                   </div>
                 </div>
 
